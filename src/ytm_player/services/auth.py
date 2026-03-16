@@ -101,12 +101,17 @@ class AuthManager:
     def is_authenticated(self) -> bool:
         """Check whether a valid auth file exists on disk."""
         if not self._auth_file.exists():
+            logger.warning("Auth file missing: %s", self._auth_file)
             return False
         try:
             with open(self._auth_file, encoding="utf-8") as f:
                 data = json.load(f)
-            return bool(data.get("cookie"))
-        except (json.JSONDecodeError, OSError):
+            has_cookie = bool(data.get("cookie"))
+            if not has_cookie:
+                logger.warning("Auth file exists but 'cookie' field is empty")
+            return has_cookie
+        except (json.JSONDecodeError, OSError) as exc:
+            logger.warning("Auth file unreadable: %s", exc)
             return False
 
     def create_ytmusic_client(self) -> YTMusic:
