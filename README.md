@@ -70,6 +70,14 @@ yay -S ytm-player-git
 
 Or with any other AUR helper. Package: [ytm-player-git](https://aur.archlinux.org/packages/ytm-player-git)
 
+#### Gentoo ([GURU](https://wiki.gentoo.org/wiki/Project:GURU))
+
+Enable the repository as read in [Project:GURU/Information for End Users](https://wiki.gentoo.org/wiki/Project:GURU/Information_for_End_Users) then emerge the package:
+
+```bash
+emerge --ask media-sound/ytm-player
+```
+
 #### PyPI (Linux / macOS)
 
 ```bash
@@ -162,6 +170,16 @@ nix develop  # drops you into a shell with all deps + dev tools
 > export LD_LIBRARY_PATH="/run/current-system/sw/lib:$LD_LIBRARY_PATH"
 > ```
 > The flake handles this automatically — no manual `LD_LIBRARY_PATH` needed.
+
+#### Gentoo ([GURU](https://wiki.gentoo.org/wiki/Project:GURU))
+
+Enable the repository as described in [Project:GURU/Information for End Users](https://wiki.gentoo.org/wiki/Project:GURU/Information_for_End_Users) then emerge the package:
+
+```bash
+emerge --ask media-sound/ytm-player
+```
+
+> **Note:** The Gentoo package is community-maintained via the [GURU overlay](https://wiki.gentoo.org/wiki/Project:GURU) (thanks @dsafxP).
 
 #### Optional extras (pip)
 

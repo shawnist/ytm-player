@@ -68,6 +68,7 @@ Homepage = "https://github.com/peternaame-boop/ytm-player"
 Repository = "https://github.com/peternaame-boop/ytm-player"
 "Bug Tracker" = "https://github.com/peternaame-boop/ytm-player/issues"
 "AUR Package" = "https://aur.archlinux.org/packages/ytm-player-git"
+"Gentoo Package" = "https://gitweb.gentoo.org/repo/proj/guru.git/tree/media-sound/ytm-player"
 Changelog = "https://github.com/peternaame-boop/ytm-player/blob/master/CHANGELOG.md"
 
 [project.scripts]

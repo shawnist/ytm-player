@@ -279,8 +279,8 @@ class QueuePage(Widget):
                         await self.app.play_track(track)  # type: ignore[attr-defined]
                         self._refresh_queue()
 
-            # Remove selected track from queue (d key typically).
-            case Action.TRACK_ACTIONS:
+            # Remove selected track from queue (d d / delete key).
+            case Action.DELETE_ITEM:
                 self._remove_selected(table, queue)
 
             # Reorder: move track up (C-k).

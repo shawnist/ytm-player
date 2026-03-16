@@ -6,6 +6,19 @@ Format follows [Keep a Changelog](https://keepachangelog.com/).
 
 ---
 
+### v1.5.1 (2026-03-12)
+
+**New**
+- Multi-account auth support — `ytm setup` now handles Google accounts logged into multiple YouTube Music profiles, probing all `x-goog-authuser` indices automatically (thanks @glywil, PR [#15](https://github.com/peternaame-boop/ytm-player/pull/15))
+- Gentoo packaging — available in the GURU overlay via `emerge media-sound/ytm-player` (thanks @dsafxP, PR [#21](https://github.com/peternaame-boop/ytm-player/pull/21))
+
+**Fixes**
+- Fixed `nix build` failing — added missing `pillow` to core Nix deps, resolved `python-mpv` vs `mpv` dist-info name mismatch with `pythonRemoveDeps`, added `transliteration` optional dep (fixes [#18](https://github.com/peternaame-boop/ytm-player/issues/18), thanks @muhmud)
+- Fixed Browse page showing "Unknown" artist in notifications — raw API items now normalized before playback (fixes [#19](https://github.com/peternaame-boop/ytm-player/issues/19), thanks @Gimar250, PR [#20](https://github.com/peternaame-boop/ytm-player/pull/20))
+- Fixed `d d` / `delete` keybind not removing tracks on the Queue page — was matching `TRACK_ACTIONS` instead of `DELETE_ITEM` (fixes [#22](https://github.com/peternaame-boop/ytm-player/issues/22), thanks @CarterSnich)
+
+---
+
 ### v1.5.0 (2026-03-09)
 
 **Refactor**

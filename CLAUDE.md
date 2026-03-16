@@ -102,7 +102,8 @@ AUR package URL: https://aur.archlinux.org/packages/ytm-player-git
 
 ## Distribution
 
-Published on three channels:
+Published on four channels:
 - **PyPI:** `pip install ytm-player` — https://pypi.org/project/ytm-player/
 - **AUR:** `yay -S ytm-player-git` — https://aur.archlinux.org/packages/ytm-player-git
 - **NixOS:** `flake.nix` with `ytm-player` and `ytm-player-full` packages
+- **Gentoo:** `emerge media-sound/ytm-player` via GURU overlay (community-maintained by @dsafxP)

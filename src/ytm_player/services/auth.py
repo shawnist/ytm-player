@@ -11,6 +11,7 @@ import json
 import logging
 import os
 import sys
+import tempfile
 from http.cookiejar import MozillaCookieJar
 from pathlib import Path
 
@@ -173,7 +174,7 @@ class AuthManager:
         # Try cookies file first (unless a specific browser was requested).
         if self._cookies_file and not browser:
             print(f"  Trying cookies file: {self._cookies_file}")
-            if self._refresh_from_cookies_file(Path(self._cookies_file)):
+            if self._refresh_from_cookies_file(Path(self._cookies_file), interactive=True):
                 return True
             print("  Cookies file extraction failed. Falling back to browser/manual setup.")
             print()
@@ -182,7 +183,7 @@ class AuthManager:
             # User specified a browser explicitly.
             print(f"  Trying browser: {browser}")
             print()
-            if self._extract_and_save(browser):
+            if self._extract_and_save(browser, interactive=True):
                 return True
             print(f"  Could not extract from {browser}. Falling back to manual setup.")
             print()
@@ -194,7 +195,7 @@ class AuthManager:
             print(f"  Found YouTube cookies in {detected}.")
             print("  Extracting automatically...")
             print()
-            if self._extract_and_save(detected):
+            if self._extract_and_save(detected, interactive=True):
                 return True
             print("  Auto-extraction failed. Falling back to manual setup.")
             print()
@@ -228,7 +229,7 @@ class AuthManager:
                 continue
         return None
 
-    def _refresh_from_cookies_file(self, cookies_file: Path) -> bool:
+    def _refresh_from_cookies_file(self, cookies_file: Path, interactive: bool = False) -> bool:
         """Refresh auth from cookies file without losing working credentials."""
         backup: bytes | None = None
         if self._auth_file.exists():
@@ -237,7 +238,7 @@ class AuthManager:
             except OSError:
                 logger.debug("Could not backup existing auth file", exc_info=True)
 
-        if not self._extract_and_save_from_cookies_file(cookies_file):
+        if not self._extract_and_save_from_cookies_file(cookies_file, interactive=interactive):
             return False
 
         try:
@@ -250,12 +251,14 @@ class AuthManager:
             try:
                 self._auth_file.write_bytes(backup)
                 secure_chmod(self._auth_file, SECURE_FILE_MODE)
-                logger.info("Restored previous auth after cookies file validation failure")
+                logger.debug("Restored previous auth after cookies file validation failure")
             except OSError:
                 logger.warning("Failed to restore previous auth file", exc_info=True)
         return False
 
-    def _extract_and_save_from_cookies_file(self, cookies_file: Path) -> bool:
+    def _extract_and_save_from_cookies_file(
+        self, cookies_file: Path, interactive: bool = False
+    ) -> bool:
         """Extract YouTube cookies from a Netscape cookies.txt file and write auth.json."""
         if not cookies_file.exists():
             logger.warning("Cookies file does not exist: %s", cookies_file)
@@ -288,12 +291,12 @@ class AuthManager:
             logger.warning("No youtube.com cookies found in %s", cookies_file)
             return False
 
-        if self._save_youtube_cookies(yt_cookies):
+        if self._save_youtube_cookies(yt_cookies, interactive=interactive):
             print(f"  Cookies extracted from file and saved: {cookies_file}")
             return True
         return False
 
-    def _extract_and_save(self, browser: str) -> bool:
+    def _extract_and_save(self, browser: str, interactive: bool = False) -> bool:
         """Extract YouTube cookies from *browser* and write auth.json."""
         try:
             from yt_dlp.cookies import extract_cookies_from_browser
@@ -311,12 +314,12 @@ class AuthManager:
             logger.warning("No .youtube.com cookies found in %s", browser)
             return False
 
-        if self._save_youtube_cookies(yt_cookies):
+        if self._save_youtube_cookies(yt_cookies, interactive=interactive):
             print(f"  Cookies extracted from {browser} and saved.")
             return True
         return False
 
-    def _save_youtube_cookies(self, cookies: list) -> bool:
+    def _save_youtube_cookies(self, cookies: list, interactive: bool = False) -> bool:
         """Persist YouTube cookie headers into auth.json."""
         cookie_str = "; ".join(f"{c.name}={c.value}" for c in cookies)
 
@@ -327,17 +330,109 @@ class AuthManager:
             logger.warning("SAPISID cookie not found in extracted cookies")
             return False
 
-        # Build the headers dict that ytmusicapi expects.
-        headers = dict(initialize_headers())
-        headers["cookie"] = cookie_str
-        headers["x-goog-authuser"] = "0"
-
-        # Generate an initial SAPISIDHASH so ytmusicapi detects BROWSER auth type.
+        # Build the base headers dict that ytmusicapi expects.
         origin = "https://music.youtube.com"
-        headers["authorization"] = get_authorization(sapisid + " " + origin)
+        base_headers = dict(initialize_headers())
+        base_headers["cookie"] = cookie_str
+        base_headers["authorization"] = get_authorization(sapisid + " " + origin)
 
-        # Save atomically with correct permissions from creation.
+        # Probe x-goog-authuser indices 0–4. The SAPISID cookie is shared across
+        # all Google accounts signed into the browser — x-goog-authuser is a
+        # server-side account selector with no mapping to cookie names.
+        authuser_indices = list(range(5))
+
+        # Probe each account index and collect all valid YouTube Music accounts.
+        # Capture any previously saved account preference before probing overwrites the auth file.
+        preferred_index_before_probe: int | None = None
+        if self._auth_file.exists():
+            try:
+                existing = json.loads(self._auth_file.read_text(encoding="utf-8"))
+                preferred_index_before_probe = int(existing.get("x-goog-authuser", 0))
+            except (OSError, json.JSONDecodeError, ValueError):
+                pass
         self._config_dir.mkdir(parents=True, exist_ok=True)
+        valid_accounts: list[tuple[int, str, str]] = []  # (authuser_index, accountName, handle)
+        for authuser in authuser_indices:
+            headers = {**base_headers, "x-goog-authuser": str(authuser)}
+            try:
+                fd, tmp_path = tempfile.mkstemp(suffix=".json", dir=str(self._config_dir))
+                with os.fdopen(fd, "w", encoding="utf-8") as f:
+                    json.dump(headers, f, ensure_ascii=True, indent=4, sort_keys=True)
+                ytm = YTMusic(tmp_path)
+                account = ytm.get_account_info()
+                name = account.get("accountName")
+                handle = account.get("channelHandle") or ""
+                if name:
+                    valid_accounts.append((authuser, name, handle))
+            except Exception:
+                logger.debug("x-goog-authuser=%d did not work, skipping", authuser)
+            finally:
+                try:
+                    os.unlink(tmp_path)
+                except (OSError, UnboundLocalError):
+                    pass
+
+        if not valid_accounts:
+            logger.warning(
+                "No valid YouTube Music account found in extracted cookies (tried indices %s)",
+                authuser_indices,
+            )
+            return False
+
+        def _label(authuser: int, name: str, handle: str) -> str:
+            parts = [name]
+            if handle:
+                parts.append(handle)
+            parts.append(f"browser slot {authuser}")
+            return "  ·  ".join(parts)
+
+        if len(valid_accounts) == 1:
+            chosen_index, chosen_name, chosen_handle = valid_accounts[0]
+            print(f"  Authenticated as: {_label(chosen_index, chosen_name, chosen_handle)}")
+        elif interactive:
+            # Interactive setup — let the user pick (e.g. to select a Premium account).
+            print()
+            print("  Multiple Google accounts found. Select your YouTube Music account.")
+            print("  If you have YouTube Music Premium, pick that account.")
+            print()
+            print("  Note: 'browser slot N' shows the position of each account in your")
+            print("  browser's account list — slot 0 is the first account you added,")
+            print("  slot 1 the second, and so on. To check, click your profile picture")
+            print("  in Chrome/Firefox: accounts are listed in the same order.")
+            print()
+            for i, (authuser, name, handle) in enumerate(valid_accounts):
+                print(f"  [{i + 1}] {_label(authuser, name, handle)}")
+            print()
+            while True:
+                try:
+                    raw = input(f"  Enter number [1-{len(valid_accounts)}]: ").strip()
+                    choice = int(raw) - 1
+                    if 0 <= choice < len(valid_accounts):
+                        break
+                except ValueError:
+                    pass
+                except (EOFError, KeyboardInterrupt):
+                    print("\n  Cancelled.")
+                    return False
+                print(f"  Please enter a number between 1 and {len(valid_accounts)}.")
+            chosen_index, chosen_name, chosen_handle = valid_accounts[choice]
+            print(f"  Selected: {_label(chosen_index, chosen_name, chosen_handle)}")
+        else:
+            # Silent auto-refresh: preserve the previously chosen account index.
+            # Fall back to the first valid account if no preference is recorded.
+            preferred = next(
+                (a for a in valid_accounts if a[0] == preferred_index_before_probe),
+                valid_accounts[0],
+            )
+            chosen_index, chosen_name, chosen_handle = preferred
+            logger.debug(
+                "Auto-refresh: using account index %d (%s)",
+                chosen_index,
+                _label(chosen_index, chosen_name, chosen_handle),
+            )
+
+        # Write the final auth file for the chosen account.
+        headers = {**base_headers, "x-goog-authuser": str(chosen_index)}
         fd = os.open(str(self._auth_file), os.O_WRONLY | os.O_CREAT | os.O_TRUNC, SECURE_FILE_MODE)
         with os.fdopen(fd, "w", encoding="utf-8") as f:
             json.dump(headers, f, ensure_ascii=True, indent=4, sort_keys=True)

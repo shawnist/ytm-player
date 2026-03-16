@@ -304,6 +304,56 @@ class TestShuffleAdvanced:
         assert queue_manager.play_random() is None
 
 
+class TestRemoveEdgeCases:
+    """Edge cases for QueueManager.remove() — issue #22."""
+
+    def test_remove_currently_playing(self, queue_manager, sample_tracks):
+        for t in sample_tracks:
+            queue_manager.add(t)
+        queue_manager.jump_to(2)
+        assert queue_manager.current()["video_id"] == "vid_03"
+
+        queue_manager.remove(2)
+        assert queue_manager.length == 4
+        # After removing current, index stays in bounds and points to the next track.
+        current = queue_manager.current()
+        assert current is not None
+        assert current["video_id"] == "vid_04"
+
+    def test_remove_last_track_empties_queue(self, queue_manager):
+        from tests.conftest import _make_track
+
+        track = _make_track("only", "Only Track", "Solo Artist", 100)
+        queue_manager.add(track)
+        queue_manager.jump_to(0)
+        assert queue_manager.current()["video_id"] == "only"
+
+        queue_manager.remove(0)
+        assert queue_manager.is_empty
+        assert queue_manager.current() is None
+
+    def test_remove_before_current_adjusts_index(self, queue_manager, sample_tracks):
+        for t in sample_tracks:
+            queue_manager.add(t)
+        queue_manager.jump_to(3)
+        assert queue_manager.current()["video_id"] == "vid_04"
+
+        queue_manager.remove(1)
+        assert queue_manager.length == 4
+        # Current track should still be vid_04 (index shifted down).
+        assert queue_manager.current()["video_id"] == "vid_04"
+
+    def test_remove_after_current_keeps_index(self, queue_manager, sample_tracks):
+        for t in sample_tracks:
+            queue_manager.add(t)
+        queue_manager.jump_to(1)
+        assert queue_manager.current()["video_id"] == "vid_02"
+
+        queue_manager.remove(3)
+        assert queue_manager.length == 4
+        assert queue_manager.current()["video_id"] == "vid_02"
+
+
 class TestRadioTracks:
     def test_set_radio_tracks_deduplicates(self, queue_manager, sample_tracks):
         for t in sample_tracks:

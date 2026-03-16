@@ -70,20 +70,26 @@
           # nixpkgs may ship textual 8.x while pyproject.toml says <8.0.
           pythonRelaxDeps = [ "textual" ];
 
+          # python-mpv on PyPI registers as "mpv" in dist-info.
+          # Remove the PyPI name so pythonRuntimeDepsCheck doesn't fail.
+          pythonRemoveDeps = [ "python-mpv" ];
+
           dependencies = with python.pkgs; [
             textual
             ytmusicapi
             yt-dlp
-            mpv
+            mpv            # provides python-mpv (dist-info Name: mpv)
             aiosqlite
             click
+            pillow         # album art (moved from optional to core in v1.3.1)
           ];
 
           optional-dependencies = with python.pkgs; {
             mpris = [ dbus-next ];
-            images = [ pillow ];
+            images = [ ];  # Pillow moved to core deps; kept for compat
             discord = [ pypresence ];
             lastfm = [ pylast ];
+            transliteration = [ anyascii ];
             spotify = [
               spotipy
               spotifyscraper
@@ -133,9 +139,9 @@
             dependencies =
               old.dependencies
               ++ old.optional-dependencies.mpris
-              ++ old.optional-dependencies.images
               ++ old.optional-dependencies.discord
               ++ old.optional-dependencies.lastfm
+              ++ old.optional-dependencies.transliteration
               ++ old.optional-dependencies.spotify;
           });
         };
@@ -159,6 +165,7 @@
               spotipy
               spotifyscraper
               thefuzz
+              anyascii
             ])
             ++ [
               pkgs.mpv
