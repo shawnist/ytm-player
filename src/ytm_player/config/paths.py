@@ -76,7 +76,8 @@ _dirs_ensured = False
 def secure_chmod(path: Path | str, mode: int) -> None:
     """Set file permissions — no-op on Windows where Unix modes are meaningless."""
     if sys.platform != "win32":
-        os.chmod(path, mode)
+        if os.stat(path).st_mode & 0o777 != mode:
+            os.chmod(path, mode)
 
 
 def ensure_dirs() -> None:

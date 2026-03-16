@@ -77,12 +77,18 @@ def is_tui_running() -> bool:
     try:
         pid = int(PID_FILE.read_text(encoding="utf-8").strip())
     except (ValueError, OSError):
-        PID_FILE.unlink(missing_ok=True)
+        try:
+            PID_FILE.unlink(missing_ok=True)
+        except PermissionError:
+            pass
         return False
     if _is_pid_alive(pid):
         return True
     # Process is dead — clean up stale PID file and IPC port file (Windows).
-    PID_FILE.unlink(missing_ok=True)
+    try:
+        PID_FILE.unlink(missing_ok=True)
+    except PermissionError:
+        pass
     if sys.platform == "win32":
         from ytm_player.config.paths import IPC_PORT_FILE
 
