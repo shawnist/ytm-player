@@ -178,6 +178,16 @@ class PlaybackMixin:
             )
             await self.mac_media.update_playback_status("Playing")
 
+        # Update cmux sidebar pills.
+        if self.cmux and self.cmux.is_available:
+            next_track = self.queue.peek_next()
+            await self.cmux.update(
+                title=track.get("title") or "",
+                artist=track.get("artist") or "",
+                next_title=next_track.get("title") if next_track else None,
+                next_artist=next_track.get("artist") if next_track else None,
+            )
+
     async def _toggle_play_pause(self) -> None:
         """Toggle play/pause, starting playback from queue if player is idle."""
         if self.player and self.player.current_track is None and self.queue.current_track:
