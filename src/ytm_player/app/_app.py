@@ -24,6 +24,7 @@ from ytm_player.ipc import IPCServer, remove_pid, write_pid
 from ytm_player.services.auth import AuthManager
 from ytm_player.services.cache import CacheManager
 from ytm_player.services.cmux import CmuxService
+from ytm_player.services.command_center import CommandCenterService
 from ytm_player.services.discord_rpc import DiscordRPC
 from ytm_player.services.download import DownloadService
 from ytm_player.services.history import HistoryManager
@@ -127,6 +128,7 @@ class YTMPlayerApp(
         self.discord: DiscordRPC | None = None
         self.lastfm: LastFMService | None = None
         self.cmux: CmuxService = CmuxService()
+        self.command_center: CommandCenterService = CommandCenterService()
         self.downloader: DownloadService = DownloadService()
 
         # Key input state for multi-key sequences and count prefixes.
@@ -397,7 +399,9 @@ class YTMPlayerApp(
         if self.discord:
             await self.discord.disconnect()
 
-        if self.cmux and self.cmux.is_available:
+        if self.command_center and self.command_center.is_available:
+            await self.command_center.clear()
+        elif self.cmux and self.cmux.is_available:
             await self.cmux.clear()
 
         if self.history:

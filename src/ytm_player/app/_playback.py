@@ -178,8 +178,16 @@ class PlaybackMixin:
             )
             await self.mac_media.update_playback_status("Playing")
 
-        # Update cmux sidebar pills.
-        if self.cmux and self.cmux.is_available:
+        # Update now-playing pills: Command Center (explicit) takes priority over cmux.
+        if self.command_center and self.command_center.is_available:
+            next_track = self.queue.peek_next()
+            await self.command_center.update(
+                title=track.get("title") or "",
+                artist=track.get("artist") or "",
+                next_title=next_track.get("title") if next_track else None,
+                next_artist=next_track.get("artist") if next_track else None,
+            )
+        elif self.cmux and self.cmux.is_available:
             next_track = self.queue.peek_next()
             await self.cmux.update(
                 title=track.get("title") or "",
