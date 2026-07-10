@@ -256,6 +256,13 @@ class Player:
             input_vo_keyboard=False,
             log_handler=_on_mpv_log,
             loglevel="warn",
+            # On macOS the default coreaudio AO can fail to negotiate stereo
+            # against multichannel pro interfaces (e.g. a 36-out UA Apollo as
+            # system output) and silently falls back to mono, which lands on a
+            # single channel — heard as left-only. The avfoundation AO plays
+            # through the system mixer like an ordinary app and always gets a
+            # proper stereo path.
+            **({"ao": "avfoundation"} if sys.platform == "darwin" else {}),
         )
 
         # Enable gapless playback if configured.
